@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Barrière</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #e63946;
+    --blue: #1d7ef2;
+    --bg: #0f1117;
+    --glow-red: 0 0 18px rgba(230,57,70,0.5);
+    --glow-blue: 0 0 18px rgba(29,126,242,0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    height: var(--tg-viewport-stable-height, 100vh);
+    overflow: hidden;
+  }
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: #e0e0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  /* ── LOBBY ─────────────────────────────────────────────── */
+  #lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    width: 100%;
+    max-width: 320px;
+    padding: 24px;
+  }
+  #lobby h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    letter-spacing: 5px;
+    background: linear-gradient(90deg, var(--red), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  #lobby p.sub {
+    color: rgba(255,255,255,0.4);
+    font-size: 0.82rem;
+    text-align: center;
+  }
+  .lobby-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lobby-btn:active { opacity: 0.75; }
+  #btn-create {
+    background: linear-gradient(135deg, var(--red), #c1121f);
+    color: white;
+  }
+  #btn-join-open {
+    background: linear-gradient(135deg, var(--blue), #0d5bb5);
+    color: white;
+  }
+
+  /* ── JOIN PANEL ─────────────────────────────────────────── */
+  #join-panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+  #join-panel.show { display: flex; }
+  #code-input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(29,126,242,0.4);
+    background: rgba(29,126,242,0.08);
+    color: white;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 8px;
+    text-align: center;
+    outline: none;
+    text-transform: uppercase;
+  }
+  #code-input::placeholder { color: rgba(255,255,255,0.2); letter-spacing: 4px; font-size: 1.2rem; }
+  #btn-join-confirm {
+    background: linear-gradient(135deg, var(--blue), #0d5bb5);
+    color: white;
+  }
+
+  /* ── WAITING ────────────────────────────────────────────── */
+  #waiting {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+  }
+  #waiting.show { display: flex; }
+  #room-code-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3.5rem;
+    letter-spacing: 10px;
+    color: var(--red);
+    text-shadow: var(--glow-red);
+  }
+  #waiting p { color: rgba(255,255,255,0.45); font-size: 0.85rem; }
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--red);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── GAME ───────────────────────────────────────────────── */
+  #game { display: none; flex-direction: column; align-items: center; }
+  #game.show { display: flex; }
+  h1.game-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.9rem;
+    letter-spacing: 4px;
+    margin-bottom: 5px;
+    background: linear-gradient(90deg, var(--red), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  #status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .player-info {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1.5px solid transparent;
+    transition: all 0.3s;
+    opacity: 0.4;
+  }
+  .player-info.active { opacity: 1; border-color: currentColor; }
+  .player-info.red  { color: var(--red); }
+  .player-info.blue { color: var(--blue); }
+  .player-info.active.red  { box-shadow: var(--glow-red); }
+  .player-info.active.blue { box-shadow: var(--glow-blue); }
+  .dot-icon { width: 11px; height: 11px; border-radius: 50%; }
+  .red  .dot-icon { background: var(--red); }
+  .blue .dot-icon { background: var(--blue); }
+  .walls-count { font-size: 0.72rem; opacity: 0.7; }
+  #mode-toggle {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #aaa;
+    padding: 6px 13px;
+    border-radius: 14px;
+    font-size: 0.76rem;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #mode-toggle:disabled { opacity: 0.3; cursor: default; }
+  #mode-toggle.active-wall.red-turn  { background: rgba(230,57,70,0.15);  border-color: var(--red);  color: var(--red); }
+  #mode-toggle.active-wall.blue-turn { background: rgba(29,126,242,0.15); border-color: var(--blue); color: var(--blue); }
+  #board-wrap { position: relative; touch-action: none; user-select: none; }
+  canvas { display: block; border-radius: 12px; cursor: pointer; }
+  #hint {
+    margin-top: 8px;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    min-height: 16px;
+    padding: 0 8px;
+  }
+  #my-role-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 4px;
+  }
+  #my-role-badge.red  { background: rgba(230,57,70,0.15);  color: var(--red); }
+  #my-role-badge.blue { background: rgba(29,126,242,0.15); color: var(--blue); }
+
+  /* ── OVERLAY VICTOIRE ───────────────────────────────────── */
+  #overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 100;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  #overlay.show { display: flex; }
+  #overlay h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 6px;
+  }
+  #overlay h2.red  { color: var(--red);  text-shadow: 0 0 30px rgba(230,57,70,0.7); }
+  #overlay h2.blue { color: var(--blue); text-shadow: 0 0 30px rgba(29,126,242,0.7); }
+  #overlay p { color: rgba(255,255,255,0.5); font-size: 0.88rem; }
+  #restart-btn {
+    background: linear-gradient(135deg, var(--red), var(--blue));
+    border: none; color: white;
+    padding: 11px 28px;
+    border-radius: 30px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 3px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── DÉCONNEXION ────────────────────────────────────────── */
+  #disconnected {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+    padding: 24px;
+  }
+  #disconnected.show { display: flex; }
+  #disconnected h2 { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: #ff6b6b; }
+  #disconnected p  { color: rgba(255,255,255,0.5); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<!-- ── LOBBY ───────────────────────────────────────────────── -->
+<div id="lobby">
+  <h1>BARRIÈRE</h1>
+  <p class="sub">Jeu de stratégie 2 joueurs en ligne</p>
+  <button class="lobby-btn" id="btn-create" onclick="createRoom()">⚔️ Créer une partie</button>
+  <button class="lobby-btn" id="btn-join-open" onclick="showJoinPanel()">🔗 Rejoindre</button>
+  <div id="join-panel">
+    <input id="code-input" type="text" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false">
+    <button class="lobby-btn" id="btn-join-confirm" onclick="joinRoom()">▶ Rejoindre</button>
+  </div>
+  <div id="lobby-error" style="color:#e63946;font-size:0.8rem;min-height:18px;"></div>
+</div>
+
+<!-- ── ATTENTE J2 ──────────────────────────────────────────── -->
+<div id="waiting">
+  <h1 style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:4px;background:linear-gradient(90deg,var(--red),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">EN ATTENTE</h1>
+  <p>Partage ce code avec ton adversaire :</p>
+  <div id="room-code-display"></div>
+  <div class="spinner"></div>
+  <p>En attente du joueur 2…</p>
+</div>
+
+<!-- ── JEU ────────────────────────────────────────────────── -->
+<div id="game">
+  <h1 class="game-title">BARRIÈRE</h1>
+  <div id="my-role-badge" class="red">🔴 Tu joues ROUGE</div>
+  <div id="status-bar">
+    <div class="player-info red active" id="info-red">
+      <div class="dot-icon"></div>
+      <span>ROUGE</span>
+      <span class="walls-count" id="walls-red">🧱 5</span>
+    </div>
+    <button id="mode-toggle" onclick="toggleMode()">🚶 Déplacer</button>
+    <div class="player-info blue" id="info-blue">
+      <div class="dot-icon"></div>
+      <span>BLEU</span>
+      <span class="walls-count" id="walls-blue">🧱 5</span>
+    </div>
+  </div>
+  <div id="board-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+  <div id="hint">En attente de l'adversaire…</div>
+</div>
+
+<!-- ── OVERLAY VICTOIRE ───────────────────────────────────── -->
+<div id="overlay">
+  <h2 id="win-text"></h2>
+  <p id="win-sub"></p>
+  <button id="restart-btn" onclick="sendRestart()">REJOUER</button>
+</div>
+
+<!-- ── DÉCONNEXION ────────────────────────────────────────── -->
+<div id="disconnected">
+  <h2>CONNEXION PERDUE</h2>
+  <p>Ton adversaire s'est déconnecté.</p>
+  <button class="lobby-btn" id="btn-create" onclick="location.reload()" style="max-width:200px;">↩ Retour</button>
+</div>
+
+<script>
+// ── Telegram Mini App ──────────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); tg.disableVerticalSwipes(); }
+
+// ── CONFIG ─────────────────────────────────────────────────
+const WS_URL = "wss://red-boat-0c6a.mamounatasawadogo06.workers.dev";
+
+// ── STATE ──────────────────────────────────────────────────
+let ws         = null;
+let myRole     = null;   // 'red' | 'blue'
+let roomCode   = null;
+let gameState  = null;
+let mode       = 'move';
+let movHighlights = [];
+let wallStep   = 'idle';
+let firstPoint = null;
+let validSecond = [];
+
+// ── WEBSOCKET ──────────────────────────────────────────────
+function connectWS(onOpen) {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = onOpen;
+  ws.onmessage = e => handleMessage(JSON.parse(e.data));
+  ws.onerror   = () => showLobbyError("Impossible de contacter le serveur");
+  ws.onclose   = () => {
+    if (gameState && !gameState.winner) showDisconnected();
+  };
+}
+
+function handleMessage(msg) {
+  if (msg.type === "created") {
+    myRole   = "red";
+    roomCode = msg.code;
+    showWaiting(msg.code);
+  }
+  else if (msg.type === "joined") {
+    myRole   = "blue";
+    roomCode = msg.code;
+    gameState = msg.state;
+    showGame();
+  }
+  else if (msg.type === "start") {
+    gameState = msg.state;
+    showGame();
+  }
+  else if (msg.type === "update") {
+    gameState = msg.state;
+    resetLocalUI();
+    updateUI();
+    draw();
+    if (gameState.winner) showWin(gameState.winner);
+  }
+  else if (msg.type === "error") {
+    showLobbyError(msg.msg);
+  }
+  else if (msg.type === "opponent_left") {
+    showDisconnected();
+  }
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify(obj));
+}
+
+// ── LOBBY ACTIONS ──────────────────────────────────────────
+function createRoom() {
+  showLobbyError("");
+  connectWS(() => send({ action: "create" }));
+}
+
+function showJoinPanel() {
+  const p = document.getElementById("join-panel");
+  p.classList.toggle("show");
+  if (p.classList.contains("show"))
+    document.getElementById("code-input").focus();
+}
+
+function joinRoom() {
+  const code = document.getElementById("code-input").value.trim().toUpperCase();
+  if (code.length !== 4) { showLobbyError("Code à 4 lettres"); return; }
+  showLobbyError("");
+  connectWS(() => send({ action: "join", code }));
+}
+
+function showLobbyError(msg) {
+  document.getElementById("lobby-error").textContent = msg;
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────
+function showWaiting(code) {
+  document.getElementById("lobby").style.display   = "none";
+  document.getElementById("waiting").classList.add("show");
+  document.getElementById("room-code-display").textContent = code;
+}
+
+function showGame() {
+  document.getElementById("lobby").style.display   = "none";
+  document.getElementById("waiting").classList.remove("show");
+  document.getElementById("game").classList.add("show");
+
+  const badge = document.getElementById("my-role-badge");
+  badge.className = myRole;
+  badge.textContent = myRole === "red" ? "🔴 Tu joues ROUGE" : "🔵 Tu joues BLEU";
+
+  initCanvas();
+  resetLocalUI();
+  updateUI();
+  draw();
+  updateHintForTurn();
+}
+
+function showDisconnected() {
+  document.getElementById("disconnected").classList.add("show");
+}
+
+// ── CANVAS ─────────────────────────────────────────────────
+const GRID = 9, CELL = 52, GAP = 8, PAD = 20;
+const STEP  = CELL + GAP;
+const TOTAL = PAD * 2 + GRID * CELL + (GRID - 1) * GAP;
+const NODE_R = 5, NODE_HIT = 17;
+
+let canvas, ctx;
+
+function initCanvas() {
+  canvas = document.getElementById("canvas");
+  ctx    = canvas.getContext("2d");
+  canvas.width  = TOTAL;
+  canvas.height = TOTAL;
+  applyScale();
+  if (tg) tg.onEvent("viewportChanged", applyScale);
+  window.addEventListener("resize", applyScale);
+  canvas.addEventListener("click",    onTap);
+  canvas.addEventListener("touchend", e => { e.preventDefault(); onTap(e); }, { passive: false });
+}
+
+function applyScale() {
+  const availW = window.innerWidth - 16;
+  const availH = (tg?.viewportStableHeight || window.innerHeight) - 130;
+  const scale  = Math.min(1, availW / TOTAL, availH / TOTAL);
+  canvas.style.width  = (TOTAL * scale) + "px";
+  canvas.style.height = (TOTAL * scale) + "px";
+}
+
+// ── UI ─────────────────────────────────────────────────────
+function isMyTurn() { return gameState && gameState.turn === myRole && !gameState.winner; }
+
+function updateUI() {
+  if (!gameState) return;
+  const { turn, wallsRed, wallsBlue } = gameState;
+  document.getElementById("info-red").classList.toggle("active",  turn === "red");
+  document.getElementById("info-blue").classList.toggle("active", turn === "blue");
+  document.getElementById("walls-red").textContent  = "🧱 " + wallsRed;
+  document.getElementById("walls-blue").textContent = "🧱 " + wallsBlue;
+  const btn = document.getElementById("mode-toggle");
+  btn.textContent = mode === "move" ? "🚶 Déplacer" : "🧱 Barrière";
+  btn.disabled    = !isMyTurn();
+  btn.classList.toggle("active-wall", mode === "wall");
+  btn.classList.toggle("red-turn",  mode === "wall" && turn === "red");
+  btn.classList.toggle("blue-turn", mode === "wall" && turn === "blue");
+}
+
+function updateHintForTurn() {
+  if (!gameState) return;
+  if (gameState.winner) return;
+  if (isMyTurn()) setHint("🎯 C'est ton tour — appuie sur ta pièce");
+  else            setHint("⏳ En attente de l'adversaire…");
+}
+
+function setHint(msg) { document.getElementById("hint").textContent = msg; }
+
+function resetLocalUI() {
+  movHighlights = [];
+  wallStep      = "idle";
+  firstPoint    = null;
+  validSecond   = [];
+  mode          = "move";
+}
+
+function toggleMode() {
+  if (!isMyTurn()) return;
+  mode = mode === "move" ? "wall" : "move";
+  resetLocalUI();
+  mode = mode === "move" ? "move" : "wall"; // conserver le switch
+  // recalcul propre
+  movHighlights = [];
+  wallStep = "idle";
+  firstPoint = null;
+  validSecond = [];
+  updateUI();
+  setHint(mode === "wall"
+    ? "Appuie sur un point de bord pour commencer la barrière"
+    : "Appuie sur ta pièce pour voir tes déplacements");
+  draw();
+}
+
+// ── ACTIONS RÉSEAU ─────────────────────────────────────────
+function sendMove(pos) {
+  send({ action: "move", pos });
+}
+
+function sendWall(wall) {
+  send({ action: "wall", wall });
+}
+
+function sendRestart() {
+  send({ action: "restart" });
+  document.getElementById("overlay").classList.remove("show");
+}
+
+// ── VICTOIRE ───────────────────────────────────────────────
+function showWin(player) {
+  const isMe = player === myRole;
+  document.getElementById("win-text").textContent = player === "red" ? "🔴 ROUGE GAGNE !" : "🔵 BLEU GAGNE !";
+  document.getElementById("win-text").className   = player;
+  document.getElementById("win-sub").textContent  = isMe ? "🏆 Tu as gagné !" : "😔 Tu as perdu…";
+  document.getElementById("overlay").classList.add("show");
+  tg?.HapticFeedback?.notificationOccurred(isMe ? "success" : "error");
+}
+
+// ══════════════════════════════════════════════════════════════
+// GÉOMÉTRIE & LOGIQUE (identique à la version locale)
+// ══════════════════════════════════════════════════════════════
+function cellXY(r, c)   { return { x: PAD + c * STEP, y: PAD + r * STEP }; }
+function cornerXY(r, c) { return { x: PAD + c * STEP, y: PAD + r * STEP }; }
+
+function pixelToCell(px, py) {
+  const x = px - PAD, y = py - PAD;
+  const c = Math.floor(x / STEP), r = Math.floor(y / STEP);
+  if (r < 0 || r >= GRID || c < 0 || c >= GRID) return null;
+  if ((x - c * STEP) > CELL || (y - r * STEP) > CELL) return null;
+  return { r, c };
+}
+
+function allCorners() {
+  const seen = new Set(), pts = [];
+  const add = (r, c) => { const k=`${r},${c}`; if(!seen.has(k)){seen.add(k);pts.push({r,c});} };
+  for (let r=1;r<GRID;r++) for (let c=0;c<=GRID-3;c++) { add(r,c); add(r,c+2); }
+  for (let r=0;r<=GRID-3;r++) for (let c=1;c<GRID;c++) { add(r,c); add(r+2,c); }
+  return pts;
+}
+
+function pixelToPoint(px, py) {
+  let best=null, bestD=NODE_HIT;
+  for (const {r,c} of allCorners()) {
+    const {x,y}=cornerXY(r,c), d=Math.hypot(px-x,py-y);
+    if (d<bestD){bestD=d;best={r,c};}
+  }
+  return best;
+}
+
+function wallSegments(w) {
+  return w.type==='h'
+    ? [{type:'h',r:w.r,c:w.c},{type:'h',r:w.r,c:w.c+1}]
+    : [{type:'v',r:w.r,c:w.c},{type:'v',r:w.r+1,c:w.c}];
+}
+
+function wallCollides(w) {
+  const ns = wallSegments(w);
+  for (const ex of gameState.walls) {
+    const es = wallSegments(ex);
+    if (ex.type===w.type) {
+      for (const n of ns) for (const e of es)
+        if (n.r===e.r&&n.c===e.c) return true;
+    } else {
+      const hw=w.type==='h'?w:ex, vw=w.type==='v'?w:ex;
+      if (vw.c===hw.c+1&&vw.r===hw.r-1) return true;
+    }
+  }
+  return false;
+}
+
+function getValidSeconds(corner) {
+  const result=[], {r,c}=corner;
+  if(r>=1&&r<=GRID-1&&c+2<=GRID){const w={type:'h',r,c};     if(!wallCollides(w))result.push({r,c:c+2,wall:w});}
+  if(r>=1&&r<=GRID-1&&c-2>=0)   {const w={type:'h',r,c:c-2}; if(!wallCollides(w))result.push({r,c:c-2,wall:w});}
+  if(c>=1&&c<=GRID-1&&r+2<=GRID){const w={type:'v',r,c};     if(!wallCollides(w))result.push({r:r+2,c,wall:w});}
+  if(c>=1&&c<=GRID-1&&r-2>=0)   {const w={type:'v',r:r-2,c}; if(!wallCollides(w))result.push({r:r-2,c,wall:w});}
+  return result;
+}
+
+function allPoints() {
+  return allCorners()
+    .filter(({r,c})=>getValidSeconds({r,c}).length>0)
+    .map(({r,c})=>({type:'h',r,c}));
+}
+
+function isBlocked(from, to) {
+  const dr=to.r-from.r, dc=to.c-from.c;
+  for (const w of gameState.walls) {
+    if(w.type==='h'&&dr!==0){const rb=Math.min(from.r,to.r)+1;if(w.r===rb&&(from.c===w.c||from.c===w.c+1))return true;}
+    if(w.type==='v'&&dc!==0){const cb=Math.min(from.c,to.c)+1;if(w.c===cb&&(from.r===w.r||from.r===w.r+1))return true;}
+  }
+  return false;
+}
+
+function canMove(from, to) {
+  if(to.r<0||to.r>=GRID||to.c<0||to.c>=GRID)return false;
+  if(Math.abs(to.r-from.r)+Math.abs(to.c-from.c)!==1)return false;
+  return !isBlocked(from,to);
+}
+
+function getValidMoves(pos) {
+  return [[-1,0],[1,0],[0,-1],[0,1]]
+    .map(([dr,dc])=>({r:pos.r+dr,c:pos.c+dc}))
+    .filter(to=>canMove(pos,to));
+}
+
+function cornerSame(a,b){return a&&b&&a.r===b.r&&a.c===b.c;}
+
+// ── INPUT ──────────────────────────────────────────────────
+function getPos(e) {
+  const rect=canvas.getBoundingClientRect(), s=TOTAL/rect.width;
+  let cx,cy;
+  if(e.changedTouches?.length>0){cx=e.changedTouches[0].clientX;cy=e.changedTouches[0].clientY;}
+  else if(e.touches?.length>0)  {cx=e.touches[0].clientX;cy=e.touches[0].clientY;}
+  else                          {cx=e.clientX;cy=e.clientY;}
+  return {px:(cx-rect.left)*s,py:(cy-rect.top)*s};
+}
+
+function onTap(e) {
+  if (!isMyTurn()) return;
+  const {px,py}=getPos(e);
+  if (mode==='move') handleMoveTap(px,py);
+  else               handleWallTap(px,py);
+}
+
+function handleMoveTap(px, py) {
+  const cell=pixelToCell(px,py);
+  if(!cell)return;
+  const cur = gameState[myRole];
+  if (movHighlights.length===0) {
+    if(cell.r===cur.r&&cell.c===cur.c){
+      movHighlights=getValidMoves(cur);
+      setHint(movHighlights.length?`${movHighlights.length} déplacement(s) — choisis une case`:'Aucun déplacement !');
+      draw();
+    }
+  } else {
+    const isValid=movHighlights.some(h=>h.r===cell.r&&h.c===cell.c);
+    if(isValid){
+      movHighlights=[];
+      tg?.HapticFeedback?.impactOccurred('light');
+      sendMove(cell);
+    } else {
+      movHighlights=[];
+      if(cell.r===cur.r&&cell.c===cur.c){
+        movHighlights=getValidMoves(cur);
+        setHint(`${movHighlights.length} déplacement(s)`);
+      }
+      draw();
+    }
+  }
+}
+
+function handleWallTap(px, py) {
+  const walls_left = myRole==='red' ? gameState.wallsRed : gameState.wallsBlue;
+  if(walls_left<=0){setHint('Plus de barrières !');return;}
+  const pt=pixelToPoint(px,py);
+  if(wallStep==='idle'){
+    if(!pt)return;
+    const seconds=getValidSeconds(pt);
+    if(seconds.length===0){setHint('Aucune barrière possible depuis ce point');return;}
+    wallStep='first';firstPoint=pt;validSecond=seconds;
+    setHint('Appuie sur un point adjacent pour tracer la barrière');
+    draw();
+  } else {
+    if(!pt){wallStep='idle';firstPoint=null;validSecond=[];setHint('Appuie sur un point de bord');draw();return;}
+    if(cornerSame(pt,firstPoint)){wallStep='idle';firstPoint=null;validSecond=[];draw();return;}
+    const match=validSecond.find(s=>cornerSame(s,pt));
+    if(match){
+      wallStep='idle';firstPoint=null;validSecond=[];
+      tg?.HapticFeedback?.impactOccurred('medium');
+      sendWall(match.wall);
+      return;
+    }
+    const newS=getValidSeconds(pt);
+    if(newS.length===0){setHint('Aucune barrière possible');wallStep='idle';firstPoint=null;validSecond=[];}
+    else{wallStep='first';firstPoint=pt;validSecond=newS;setHint('Appuie sur un point adjacent');}
+    draw();
+  }
+}
+
+// ── DESSIN ─────────────────────────────────────────────────
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+function draw() {
+  if(!gameState||!ctx)return;
+  ctx.clearRect(0,0,TOTAL,TOTAL);
+  ctx.fillStyle='#13151f';roundRect(0,0,TOTAL,TOTAL,14);ctx.fill();
+
+  for(let r=0;r<GRID;r++) for(let c=0;c<GRID;c++){
+    const {x,y}=cellXY(r,c);
+    const isHL=movHighlights.some(h=>h.r===r&&h.c===c);
+    if(r===0)           ctx.fillStyle='rgba(29,126,242,0.20)';
+    else if(r===GRID-1) ctx.fillStyle='rgba(230,57,70,0.20)';
+    else                ctx.fillStyle='#1e2133';
+    if(isHL) ctx.fillStyle=gameState.turn==='red'?'rgba(230,57,70,0.38)':'rgba(29,126,242,0.38)';
+    roundRect(x,y,CELL,CELL,7);ctx.fill();
+    ctx.strokeStyle=isHL?(gameState.turn==='red'?'rgba(230,57,70,0.7)':'rgba(29,126,242,0.7)'):'#252840';
+    ctx.lineWidth=1;ctx.stroke();
+  }
+
+  for(const w of gameState.walls) drawWallSegment(w,w.color==='blue'?'#1d7ef2':'#e63946',false);
+  if(mode==='wall') drawWallUI();
+  drawPlayer(gameState.red,'#e63946',gameState.turn==='red');
+  drawPlayer(gameState.blue,'#1d7ef2',gameState.turn==='blue');
+
+  ctx.font='600 10px DM Sans';ctx.textAlign='center';
+  ctx.fillStyle='rgba(29,126,242,0.55)';ctx.fillText('← OBJECTIF BLEU →',TOTAL/2,PAD-5);
+  ctx.fillStyle='rgba(230,57,70,0.55)';ctx.fillText('← OBJECTIF ROUGE →',TOTAL/2,TOTAL-5);
+}
+
+function drawWallSegment(w,color,dashed){
+  const p1=cornerXY(w.r,w.c), p2=w.type==='h'?cornerXY(w.r,w.c+2):cornerXY(w.r+2,w.c);
+  ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);
+  ctx.strokeStyle=color;ctx.lineWidth=dashed?4:5.5;ctx.lineCap='round';
+  ctx.setLineDash(dashed?[7,4]:[]);ctx.shadowColor=color;ctx.shadowBlur=dashed?6:14;
+  ctx.stroke();ctx.shadowBlur=0;ctx.setLineDash([]);
+}
+
+function drawWallUI(){
+  const pc=gameState.turn==='red'?'#e63946':'#1d7ef2';
+  if(wallStep==='idle'){
+    const drawn=new Set();
+    for(const pt of allPoints()){
+      const key=`${pt.r},${pt.c}`;if(drawn.has(key))continue;drawn.add(key);
+      const {x,y}=cornerXY(pt.r,pt.c);
+      ctx.beginPath();ctx.arc(x,y,NODE_R,0,Math.PI*2);
+      ctx.fillStyle=pc;ctx.globalAlpha=0.30;ctx.fill();ctx.globalAlpha=1;
+    }
+  } else if(wallStep==='first'&&firstPoint){
+    const fp=cornerXY(firstPoint.r,firstPoint.c);
+    ctx.beginPath();ctx.arc(fp.x,fp.y,NODE_R+3,0,Math.PI*2);
+    ctx.fillStyle=pc;ctx.shadowColor=pc;ctx.shadowBlur=18;ctx.fill();ctx.shadowBlur=0;
+    ctx.beginPath();ctx.arc(fp.x,fp.y,NODE_R+9,0,Math.PI*2);
+    ctx.strokeStyle=pc;ctx.lineWidth=1.5;ctx.globalAlpha=0.4;ctx.stroke();ctx.globalAlpha=1;
+    for(const s of validSecond){
+      const sp=cornerXY(s.r,s.c);
+      ctx.beginPath();ctx.moveTo(fp.x,fp.y);ctx.lineTo(sp.x,sp.y);
+      ctx.strokeStyle=gameState.turn==='red'?'rgba(230,57,70,0.45)':'rgba(29,126,242,0.45)';
+      ctx.lineWidth=4;ctx.lineCap='round';ctx.setLineDash([6,5]);ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(sp.x,sp.y,NODE_R+2,0,Math.PI*2);
+      ctx.fillStyle=pc;ctx.shadowColor=pc;ctx.shadowBlur=12;ctx.fill();ctx.shadowBlur=0;
+    }
+  }
+}
+
+function drawPlayer(pos,color,active){
+  const {x,y}=cellXY(pos.r,pos.c), cx=x+CELL/2, cy=y+CELL/2, r=CELL*0.27;
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=active?24:8;ctx.fill();ctx.shadowBlur=0;
+  if(active){
+    ctx.beginPath();ctx.arc(cx,cy,r+6,0,Math.PI*2);
+    ctx.strokeStyle=color;ctx.lineWidth=2;ctx.globalAlpha=0.28;ctx.stroke();ctx.globalAlpha=1;
+  }
+}
+</script>
+</body>
+</html>
